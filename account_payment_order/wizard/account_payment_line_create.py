@@ -7,6 +7,11 @@
 
 from odoo import models, fields, api, _
 
+#------------
+import logging
+_logger = logging.getLogger(__name__)
+#--------------------------
+
 
 class AccountPaymentLineCreate(models.TransientModel):
     _name = 'account.payment.line.create'
@@ -124,6 +129,38 @@ class AccountPaymentLineCreate(models.TransientModel):
     @api.multi
     def populate(self):
         domain = self._prepare_move_line_domain()
+        
+        
+        # Metodo que importa data de productos
+        class_partner_template = self.env['res.partner']
+        
+        #lineas = self.env['account.move'].search([])
+        lineas = self.env['account.move'].search([])
+        for linea in lineas:
+            if "SAR" in linea.name or linea.name == "/"  :
+                _logger.info("Linea!!! "+ str(linea.ref))  
+                linea.write({'name':linea.ref})
+                _logger.info("Nombre!!! "+ str(linea.name)) 
+                lineas_move = self.env['account.move.line'].search([('partner_id', '=',  False )])
+                for lin in linea.line_ids:
+                    _logger.info("Linea Antes: !!! "+ str(lin.name) ) 
+                    #_logger.info("Linea Antes: !!! "+ str(lin.name) +  lin.partner_id.id) 
+                    
+                    if lin.partner_id.id == False:
+                        
+                        partner_data = class_partner_template.search([('name', '=',  lin.name )])
+                        if len(partner_data) != 0:
+                            lin.write({'partner_id':partner_data.id})
+                            _logger.info("Partner: !!! "+ str(lin.partner_id.name)) 
+                            #lin.partner_id = partner_data.id
+                        else:
+                            partner_data = class_partner_template.search([('name', 'ilike',  lin.name )])
+                            if len(partner_data) != 0:
+                                lin.write({'partner_id':partner_data.id})
+                                _logger.info("Partner: !!! "+ str(lin.partner_id.name)) 
+            
+        
+        
         lines = self.env['account.move.line'].search(domain)
         self.move_line_ids = lines
         action = {

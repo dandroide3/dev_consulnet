@@ -1,18 +1,20 @@
-# © 2019 Intellego-BI.com (<http://www.intellego-BI.com>)
-# © 2009 EduSense BV (<http://www.edusense.nl>)
-# © 2011-2013 Therp BV (<https://therp.nl>)
-# © 2016 Serv. Tecnol. Avanzados - Pedro M. Baeza
-# © 2016 Akretion (Alexis de Lattre - alexis.delattre@akretion.com)
+# � 2019 Intellego-BI.com (<http://www.intellego-BI.com>)
+# � 2009 EduSense BV (<http://www.edusense.nl>)
+# � 2011-2013 Therp BV (<https://therp.nl>)
+# � 2016 Serv. Tecnol. Avanzados - Pedro M. Baeza
+# � 2016 Akretion (Alexis de Lattre - alexis.delattre@akretion.com)
 # License AGPL-3.0 or later (https://www.gnu.org/licenses/agpl.html).
-
+# -*- coding: 850 -*
 import base64
 from odoo import models, fields, api, _
 from odoo.exceptions import UserError, ValidationError
 from datetime import date, datetime
-#------------
+import locale
+#locale.setlocale(locale.LC_TIME, 'es_ES.UTF-8')
+# ------------
 import logging
 _logger = logging.getLogger(__name__)
-#--------------------------
+# --------------------------
 
 
 class AccountPaymentOrder(models.Model):
@@ -21,9 +23,11 @@ class AccountPaymentOrder(models.Model):
     _inherit = ['mail.thread']
     _order = 'id desc'
 
+    
+
     def domain_journal_id(self):
         if not self.payment_mode_id:
-            return [('type','=','bank')]
+            return [('type', '=', 'bank')]
         if self.payment_mode_id.bank_account_link == 'fixed':
             return [('id', '=', self.payment_mode_id.fixed_journal_id.id)]
         elif self.payment_mode_id.bank_account_link == 'variable':
@@ -33,18 +37,18 @@ class AccountPaymentOrder(models.Model):
     def domain_payment_mode_id(self):
         for order in self:
             if order.payment_type == 'inbound':
-                return [('payment_type','=','inbound')]
+                return [('payment_type', '=', 'inbound')]
             elif order.payment_type == 'outbound':
-                return [('payment_type','=','outbound')]
+                return [('payment_type', '=', 'outbound')]
             else:
                 return [('payment_type', '=', order.payment_type)]
-            
+
     name = fields.Char(
         string='Number', readonly=True, copy=False)  # v8 field : name
     payment_type = fields.Selection([
         ('inbound', 'Inbound'),
         ('outbound', 'Outbound'),
-        ], string='Payment Type', readonly=True, required=True)
+    ], string='Payment Type', readonly=True, required=True)
     payment_mode_id = fields.Many2one(
         'account.payment.mode', 'Payment Mode', required=True,
         ondelete='restrict', track_visibility='onchange',
@@ -84,7 +88,7 @@ class AccountPaymentOrder(models.Model):
         ('now', 'Immediately'),
         ('due', 'Due Date'),
         ('fixed', 'Fixed Date'),
-        ], string='Payment Execution Date Type', required=True, default='due',
+    ], string='Payment Execution Date Type', required=True, default='due',
         track_visibility='onchange', readonly=True,
         states={'draft': [('readonly', False)]})
     date_scheduled = fields.Date(
@@ -214,14 +218,12 @@ class AccountPaymentOrder(models.Model):
             self.payment_mode_id = payment_modes
         return res
 
-        
-        
     @api.multi
     def action_done(self):
         self.write({
             'date_done': fields.Date.context_today(self),
             'state': 'done',
-            })
+        })
         return True
 
     @api.multi
@@ -253,7 +255,7 @@ class AccountPaymentOrder(models.Model):
             'payment_line_ids': [(6, 0, paylines.ids)],
             'communication': '-'.join(
                 [line.communication for line in paylines]),
-            }
+        }
 
     @api.multi
     def draft2open(self):
@@ -265,23 +267,24 @@ class AccountPaymentOrder(models.Model):
         """
         for pago in self.payment_line_ids:
             movimiento = pago.communication
-            
-            lineas = self.env['account.move'].search([('name','=',movimiento)])
+
+            lineas = self.env['account.move'].search(
+                [('name', '=', movimiento)])
             for lin in lineas.line_ids:
                 if lin.partner_id.id == pago.partner_id.id:
                     if lin.credit != 0.0 or lin.credit != 0:
-                        _logger.info("Linea Antes: !!! "+ str(lin.partner_id.name) )  
+                        _logger.info("Linea Antes: !!! " +
+                                     str(lin.partner_id.name))
                         pago.amount_currency = abs(lin.credit)
-                        _logger.info("Linea SALDO: !!! "+ str(lin.credit) )  
-                        
-                    
-        #for pago in self.payment_line_ids:
-            #partner = pago.partner_id
-            #importe = pago.amount_currency
-            #movimiento = pago.communication
-            #balance = pago.balance
-            #pago.amount_currency = abs(balance)
-            
+                        _logger.info("Linea SALDO: !!! " + str(lin.credit))
+
+        # for pago in self.payment_line_ids:
+            # partner = pago.partner_id
+            # importe = pago.amount_currency
+            # movimiento = pago.communication
+            # balance = pago.balance
+            # pago.amount_currency = abs(balance)
+
         bplo = self.env['bank.payment.line']
         today = fields.Date.context_today(self)
         for order in self:
@@ -360,7 +363,6 @@ class AccountPaymentOrder(models.Model):
         self.write({'state': 'open'})
         return True
 
-        
     @api.model
     def _truncate_str(self, texts, size=1, zerofill=1):
         c = 0
@@ -372,7 +374,7 @@ class AccountPaymentOrder(models.Model):
         f_string_out = f_string
         if zerofill == 0:
             f_string_out = f_string.zfill(size)
-        return f_string_out        
+        return f_string_out
 
     @api.model
     def _get_user_details(self, partner):
@@ -385,15 +387,14 @@ class AccountPaymentOrder(models.Model):
         if partner:
             ref_user_model = self.env['res.users']
             ref_user_recs = []
-            user_recs = ref_user_model.search(['partner_id','=',partner])
+            user_recs = ref_user_model.search(['partner_id', '=', partner])
             for users in user_recs:
                 first_name = users.firstname
                 last_name = users.last_name
                 mothers_name = users.mothers_name
-        #return (first_name, last_name, mothers_name)        
-        return first_name        
-        
-        
+        # return (first_name, last_name, mothers_name)
+        return first_name
+
     @api.multi
     def generate_payment_file(self):
         """Returns (payment file as string, filename)"""
@@ -408,104 +409,146 @@ class AccountPaymentOrder(models.Model):
                 # http://www.bci.cl/medios/2012/empresarios/capacitacion_pnol/archivos/estructura.pdf
                 # http://www.bci.cl/medios/BCI2/pdf/Carga_Nomina.pdf
 
-                f_file_name = str(self.name) + ' - ' + str(date_today) + ' - ' + str(self.payment_mode_id.name) + '.csv'
+                f_file_name = str(self.name) + ' - ' + str(date_today) + \
+                    ' - ' + str(self.payment_mode_id.name) + '.csv'
 
                 payment_file_content = ""
                 for payline in self.payment_line_ids:
                     f_rut = ""
                     f_rut_dv = ""
-                    f_rut, f_rut_dv = payline.partner_id.document_number.split("-")
-                    f_rut = f_rut.replace('.','')
+                    f_rut, f_rut_dv = payline.partner_id.document_number.split(
+                        "-")
+                    f_rut = f_rut.replace('.', '')
 
                     # Inicio columnas archivo TXT
-                    f_no_cta_cargo = self._truncate_str(self.company_partner_bank_id.acc_number, 12)
-                    f_no_cta_destino = self._truncate_str(payline.partner_bank_id.acc_number, 18)
-                    f_banco_destino = self._truncate_str(payline.partner_bank_id.bank_id.bic[-3:], 3)
+                    f_no_cta_cargo = self._truncate_str(
+                        self.company_partner_bank_id.acc_number, 12)
+                    f_no_cta_destino = self._truncate_str(
+                        payline.partner_bank_id.acc_number, 18)
+                    f_banco_destino = self._truncate_str(
+                        payline.partner_bank_id.bank_id.bic[-3:], 3)
                     f_rut_beneficiario = self._truncate_str(f_rut, 12)
-                    f_digito_verif_beneficiario = self._truncate_str(f_rut_dv, 1)
-                    f_nombre_beneficiario = self._truncate_str(payline.partner_id.name, 45)
-                    f_monto_transferencia = self._truncate_str(payline.amount_company_currency, 16)
-                    f_no_factura_boleta = self._truncate_str(payline.communication, 20)
+                    f_digito_verif_beneficiario = self._truncate_str(
+                        f_rut_dv, 1)
+                    f_nombre_beneficiario = self._truncate_str(
+                        payline.partner_id.name, 45)
+                    f_monto_transferencia = self._truncate_str(
+                        payline.amount_company_currency, 16)
+                    f_no_factura_boleta = self._truncate_str(
+                        payline.communication, 20)
                     f_no_orden_compra = self._truncate_str('', 20)
                     f_tipo_pago = 'PRV'
-                    f_mensaje_destinatario = self._truncate_str('Pago Doc ' + str(payline.communication), 30)
+                    f_mensaje_destinatario = self._truncate_str(
+                        'Pago Doc ' + str(payline.communication), 30)
                     if payline.partner_id.email:
-                        f_email_destinatario = self._truncate_str(payline.partner_id.email, 45)
+                        f_email_destinatario = self._truncate_str(
+                            payline.partner_id.email, 45)
                     elif payline.partner_id.dte_email:
-                        f_email_destinatario = self._truncate_str(payline.partner_id.dte_email, 45)
+                        f_email_destinatario = self._truncate_str(
+                            payline.partner_id.dte_email, 45)
                     else:
                         f_email_destinatario = ""
-                    f_cuenta_inscrita = self._truncate_str('R' + payline.partner_id.document_number.replace('.','') + ' C' + payline.partner_bank_id.acc_number, 25)
+                    f_cuenta_inscrita = self._truncate_str(
+                        'R' + payline.partner_id.document_number.replace('.', '') + ' C' + payline.partner_bank_id.acc_number, 25)
                     # Fin columnas archivo TXT
 
-                    payment_file_content += f_no_cta_cargo + ';' + f_no_cta_destino + ';' + f_banco_destino + ';' + f_rut_beneficiario + ';' + f_digito_verif_beneficiario + ';' + f_nombre_beneficiario + ';' + f_monto_transferencia + ';' + f_no_factura_boleta + ';' + f_no_orden_compra + ';' + f_tipo_pago + ';' + f_mensaje_destinatario + ';' + f_email_destinatario + ';' + f_cuenta_inscrita + '\n'
+                    payment_file_content += f_no_cta_cargo + ';' + f_no_cta_destino + ';' + f_banco_destino + ';' + f_rut_beneficiario + ';' + f_digito_verif_beneficiario + ';' + f_nombre_beneficiario + ';' + \
+                        f_monto_transferencia + ';' + f_no_factura_boleta + ';' + f_no_orden_compra + ';' + f_tipo_pago + \
+                        ';' + f_mensaje_destinatario + ';' + \
+                        f_email_destinatario + ';' + f_cuenta_inscrita + '\n'
                 return (payment_file_content, f_file_name)
-                
+
             elif self.payment_mode_id.name == 'REM - Transfer BCI':
                 # Estructura de Archivo BANCO BCI - formato Texto
                 # http://www.bci.cl/medios/2012/empresarios/capacitacion_pnol/archivos/estructura.pdf
                 # http://www.bci.cl/medios/BCI2/pdf/Carga_Nomina.pdf
 
-                f_file_name = str(self.name) + ' - ' + str(date_today) + ' - ' + str(self.payment_mode_id.name) + '.csv'
+                f_file_name = str(self.name) + ' - ' + str(date_today) + \
+                    ' - ' + str(self.payment_mode_id.name) + '.csv'
 
                 payment_file_content = ""
                 for payline in self.payment_line_ids:
                     f_rut = ""
                     f_rut_dv = ""
-                    f_rut, f_rut_dv = payline.partner_id.document_number.split("-")
-                    f_rut = f_rut.replace('.','')
+                    f_rut, f_rut_dv = payline.partner_id.document_number.split(
+                        "-")
+                    f_rut = f_rut.replace('.', '')
                     # Inicio columnas archivo TXT
                     f_rut_beneficiario = self._truncate_str(f_rut, 8, 0)
-                    f_digito_verif_beneficiario = self._truncate_str(f_rut_dv, 1)
-                    f_no_cta_cargo = self._truncate_str(self.company_partner_bank_id.acc_number, 12)
-                    f_no_cta_destino = self._truncate_str(payline.partner_bank_id.acc_number, 18)
-                    f_banco_destino = self._truncate_str(payline.partner_bank_id.bank_id.bic[-3:], 3)
-                    #t_first_name = self._get_user_details(payline.partner_id)
-                    #f_nombre_beneficiario = self._truncate_str(t_first_name, 45)
-                    f_nombre_beneficiario = self._truncate_str(payline.partner_id.name, 45)
-                    f_monto_transferencia = self._truncate_str(payline.amount_company_currency , 16)
-                    f_no_factura_boleta = self._truncate_str(payline.communication, 20)
+                    f_digito_verif_beneficiario = self._truncate_str(
+                        f_rut_dv, 1)
+                    f_no_cta_cargo = self._truncate_str(
+                        self.company_partner_bank_id.acc_number, 12)
+                    f_no_cta_destino = self._truncate_str(
+                        payline.partner_bank_id.acc_number, 18)
+                    f_banco_destino = self._truncate_str(
+                        payline.partner_bank_id.bank_id.bic[-3:], 3)
+                    # t_first_name = self._get_user_details(payline.partner_id)
+                    # f_nombre_beneficiario = self._truncate_str(t_first_name, 45)
+                    f_nombre_beneficiario = self._truncate_str(
+                        payline.partner_id.name, 45)
+                    f_monto_transferencia = self._truncate_str(
+                        payline.amount_company_currency, 16)
+                    f_no_factura_boleta = self._truncate_str(
+                        payline.communication, 20)
                     f_no_orden_compra = self._truncate_str('', 20)
                     f_tipo_pago = 'REM'
-                    f_mensaje_destinatario = self._truncate_str('Pago Remuneraciones ' + str(payline.date), 30)
+                    f_mensaje_destinatario = self._truncate_str(
+                        'Pago Remuneraciones ' + str(payline.date), 30)
                     if payline.partner_id.email:
-                        f_email_destinatario = self._truncate_str(payline.partner_id.email, 45)
+                        f_email_destinatario = self._truncate_str(
+                            payline.partner_id.email, 45)
                     else:
                         f_email_destinatario = ""
-                    f_cuenta_inscrita = self._truncate_str('R' + payline.partner_id.document_number.replace('.','') + ' C' + payline.partner_bank_id.acc_number, 25)
+                    f_cuenta_inscrita = self._truncate_str(
+                        'R' + payline.partner_id.document_number.replace('.', '') + ' C' + payline.partner_bank_id.acc_number, 25)
                     # Fin columnas archivo TXT
 
-                    payment_file_content += f_rut_beneficiario + ';' + f_digito_verif_beneficiario + ';' + f_no_cta_cargo + ';' + f_no_cta_destino + ';' + f_banco_destino + ';' +  f_nombre_beneficiario + ';' + f_monto_transferencia + ';' + f_no_factura_boleta + ';' + f_no_orden_compra + ';' + f_tipo_pago + ';' + f_mensaje_destinatario + ';' + f_email_destinatario + ';' + f_cuenta_inscrita + '\n'
+                    payment_file_content += f_rut_beneficiario + ';' + f_digito_verif_beneficiario + ';' + f_no_cta_cargo + ';' + f_no_cta_destino + ';' + f_banco_destino + ';' + f_nombre_beneficiario + ';' + \
+                        f_monto_transferencia + ';' + f_no_factura_boleta + ';' + f_no_orden_compra + ';' + f_tipo_pago + \
+                        ';' + f_mensaje_destinatario + ';' + \
+                        f_email_destinatario + ';' + f_cuenta_inscrita + '\n'
 
                     return (payment_file_content, f_file_name)
-            #TODO: add PRV - Transfer Banco de Chile masivo
+            # TODO: add PRV - Transfer Banco de Chile masivo
             elif self.payment_mode_id.name == 'PRV - Transfer Banco de Chile masivo':
                 count_payline = len(self.payment_line_ids)
                 count_bankline = len(self.bank_line_ids)
                 t_filler = ""
                 f_paga_rut = ""
-                f_paga_rut_dv = "" #digito verificador del rut
-                f_paga_rut, f_paga_rut_dv = self.env.user.company_id.document_number.split("-")
+                f_paga_rut_dv = ""  # digito verificador del rut
+                f_paga_rut, f_paga_rut_dv = self.env.user.company_id.document_number.split(
+                    "-")
                 f_paga_rut = f_paga_rut.replace('.', '')
-                t_monto_nom, t_decn = str(self.total_company_currency).split(".")
+                t_monto_nom, t_decn = str(
+                    self.total_company_currency).split(".")
                 f_monto_nomina = str(t_monto_nom) + '00'
-                f_file_name = str(self.name) + ' - ' + str(date_today) + ' - ' + str(self.payment_mode_id.name) + '.txt'
+                f_file_name = str(self.name) + ' - ' + str(date_today) + \
+                    ' - ' + str(self.payment_mode_id.name) + '.txt'
                 payment_file_content = ""
                 f_filler_01 = t_filler.ljust(564)
                 for payline in self.payment_line_ids:
                     f_rut = ""
                     f_rut_dv = ""
-                    f_rut, f_rut_dv = payline.partner_id.document_number.split("-")
-                    f_rut = f_rut.replace('.','')
-                    f_no_cta_cargo = self._truncate_str(self.company_partner_bank_id.acc_number, 12)
-                    f_no_cta_destino = self._truncate_str(payline.partner_bank_id.acc_number, 18)
-                    f_banco_destino = self._truncate_str(payline.partner_bank_id.bank_id.bic[-3:], 3)
+                    f_rut, f_rut_dv = payline.partner_id.document_number.split(
+                        "-")
+                    f_rut = f_rut.replace('.', '')
+                    f_no_cta_cargo = self._truncate_str(
+                        self.company_partner_bank_id.acc_number, 12)
+                    f_no_cta_destino = self._truncate_str(
+                        payline.partner_bank_id.acc_number, 18)
+                    f_banco_destino = self._truncate_str(
+                        payline.partner_bank_id.bank_id.bic[-3:], 3)
                     f_tipo_cuenta = ""
                     f_rut_beneficiario = self._truncate_str(f_rut, 12)
-                    f_digito_verif_beneficiario = self._truncate_str(f_rut_dv, 1)
-                    f_nombre_beneficiario = self._truncate_str(payline.partner_id.name,30)
-                    f_monto_transferencia = self._truncate_str(payline.amount_company_currency, 16)
-                    f_no_factura_boleta = self._truncate_str(payline.communication, 20)
+                    f_digito_verif_beneficiario = self._truncate_str(
+                        f_rut_dv, 1)
+                    f_nombre_beneficiario = self._truncate_str(
+                        payline.partner_id.name, 30)
+                    f_monto_transferencia = self._truncate_str(
+                        payline.amount_company_currency, 16)
+                    f_no_factura_boleta = self._truncate_str(
+                        payline.communication, 20)
                     f_no_orden_compra = self._truncate_str('', 20)
                     f_tipo_pago = ""
                     email_descrip = ""
@@ -513,7 +556,8 @@ class AccountPaymentOrder(models.Model):
                         f_tipo_pago = "TEC"
                     else:
                         f_tipo_pago = 'TOB'
-                        f_tipo_cuenta = self._truncate_str(payline.partner_bank_id.acc_type, 3)
+                        f_tipo_cuenta = self._truncate_str(
+                            payline.partner_bank_id.tipo_cuenta, 3)
 
                     if self.description:
                         description = str(self.description)
@@ -522,63 +566,169 @@ class AccountPaymentOrder(models.Model):
                         description = "no descrip"
                         email_descrip = "no descrip email"
                     if payline.partner_id.email:
-                        f_email_destinatario = self._truncate_str(payline.partner_id.email, 50)
+                        f_email_destinatario = self._truncate_str(
+                            payline.partner_id.email, 50)
                     else:
                         f_email_destinatario = "no email"
-                
-                    payment_file_content = f_tipo_pago + self._truncate_str(f_paga_rut, 10, 0) + str(f_paga_rut_dv)+ '0' + f_no_cta_cargo + f_rut_beneficiario + f_digito_verif_beneficiario +'0' + self._truncate_str(f_nombre_beneficiario, 30, '') + '             ' + f_no_cta_destino + '          ' + f_monto_transferencia + '000' + '         ' + description + '        '+ email_descrip + '\n' + f_email_destinatario + '  ' + f_tipo_cuenta
-                return (payment_file_content, f_file_name)
 
+                    payment_file_content = f_tipo_pago + self._truncate_str(f_paga_rut, 10, 0) + str(f_paga_rut_dv) + '0' + f_no_cta_cargo + f_rut_beneficiario + f_digito_verif_beneficiario + '0' + self._truncate_str(
+                        f_nombre_beneficiario, 30, '') + '             ' + f_no_cta_destino + '          ' + f_monto_transferencia + '000' + '         ' + description + '        ' + email_descrip + '\n' + f_email_destinatario + '  ' + f_tipo_cuenta
+                return (payment_file_content, f_file_name)
 
             # TODO: add REM - Transfer Banco de Chile
             elif self.payment_mode_id.name == 'REM - Transfer Banco de Chile':
-                """ Estructura de generación de archivo TXT para remuneraciones de banco de chile"""
-                count_payline = len(self.payment_line_ids)
-                # count_payline = 0
-                # for cpayline in self.payment_line_ids:
-                #     count_payline += 1
-                count_bankline = 0
-                for cpayline in self.bank_line_ids:
-                    count_bankline += 1
+                count_payline = 0
+                for cpayline in self.payment_line_ids:
+                    count_payline += 1
+                
+                #count_payline = len(self.payment_line_ids)
+                #count_bankline = len(self.bank_line_ids)
                 t_filler = ""
                 f_paga_rut = ""
                 f_paga_rut_dv = ""
-                f_paga_rut, f_paga_rut_dv = self.env.user.company_id.document_number.split("-")
+                number_nom = ""
+                mes_pago = ""
+                f_paga_rut, f_paga_rut_dv = self.env.user.company_id.document_number.split(
+                    "-")
                 f_paga_rut = f_paga_rut.replace('.', '')
-                t_monto_nom, t_decn = str(self.total_company_currency).split(".")
+                t_monto_nom, t_decn = str(
+                    self.total_company_currency).split(".")
                 f_monto_nomina = str(t_monto_nom) + '00'
-
-                f_file_name = str(self.name) + ' - ' + str(date_today) + ' - ' + str(self.payment_mode_id.name) + '.txt'
-
+                num_convenio = '001'
+                number_nom = self.name
+                numero_nomina = number_nom[7:12]
+                mes_pago = date_today.strftime("%B/%Y")
+                nombre_pago = self._truncate_str("Rem" + str(mes_pago) , 25).ljust(25)
+                cod_moneda = '01'
+                fecha_pago = date_today.strftime("%Y%m%d")
+                fecha_document_txt = date_today.strftime("%Y%m")
+                tipo_endoso = 'E'
+                tipo_pago = '0101'
+                f_file_name = str(fecha_document_txt) + '_' + 'transfer_BChile' + '.txt'
+                #f_file_name = str(self.name) + ' - ' + str(date_today) + \' - ' + str(self.payment_mode_id.name) + '.txt'
+                
                 payment_file_content = ""
+
                 # Tipo Fila 01
-                f_filler_01 = t_filler.ljust(564)
+                f_filler_01 = t_filler.ljust(325)
+
+                payment_file_content = '01' + self._truncate_str(f_paga_rut, 9, 0) + str(f_paga_rut_dv) + num_convenio + str(numero_nomina) + nombre_pago + str(cod_moneda) + str(fecha_pago) + self._truncate_str(f_monto_nomina, 13, 0) + '  ' + tipo_endoso + f_filler_01 + tipo_pago + '\r\n'
+                count_payline = 0
+
                 for bankline in self.bank_line_ids:
+                    
+                    
+                    count_payline += 1
+
                     f_rut = ""
                     f_rut_dv = ""
-                    f_rut, f_rut_dv = bankline.partner_id.document_number.split("-")
+                    f_rut, f_rut_dv = bankline.partner_id.document_number.split(
+                        "-")
                     f_rut = f_rut.replace('.', '')
                     t_monto, t_dec = str(bankline.amount_currency).split(".")
                     t_streets = str(bankline.partner_id.street)
-                    f_rut = self._truncate_str(f_rut, 10, 0)
-                    f_nombre = self._truncate_str(bankline.partner_id.name.upper(), 60).ljust(60)
-                    f_direccion = self._truncate_str(t_streets.upper(), 35).ljust(35)
-                    f_comuna = self._truncate_str(bankline.partner_id.city.upper(), 15).ljust(15)
-                    f_ciudad = self._truncate_str(bankline.partner_id.state_id.name.upper(), 15).ljust(15)
-                    f_no_cta_destino = self._truncate_str(bankline.partner_bank_id.acc_number, 22).ljust(22)
-                    f_tipo_pago = 'Remun.'
-                    f_descripcion_pago = self._truncate_str("Pago de anticipo" + str(self.env.user.company_id.name).upper(), 120).ljust(120)
+                    count_payline_0 = self._truncate_str(count_payline,4, 0)
+                    count_payline_1 = self._truncate_str(count_payline,6, 0)
 
-                payment_file_content = '01' + self._truncate_str(f_paga_rut, 10, 0) + str(f_paga_rut_dv) + "       "  + f_tipo_pago + f_filler_01 + '\n' + '02' +  f_rut  + "      " + f_no_cta_destino + f_nombre + f_direccion + f_comuna + f_ciudad + f_descripcion_pago #self._truncate_str(f_monto_nomina, 13, 0) + self._truncate_str(count_bankline, 10, 0) + self._truncate_str(count_payline, 10, 0) + f_filler_01 + '\n'
+                    # Tipo Fila 02
+                    f_filler_03 = t_filler.ljust(34)
+                    f_rut = self._truncate_str(f_rut, 9, 0)
+                    f_nombre = self._truncate_str(
+                        bankline.partner_id.name.upper(), 60).ljust(60) + '0'
+                    
+                    f_direccion = self._truncate_str(
+                        t_streets.upper(), 35).ljust(35)
+                    f_comuna = self._truncate_str(
+                        bankline.partner_id.city_id.name, 15).ljust(15)
+                    f_ciudad = self._truncate_str(
+                        bankline.partner_id.city, 15).ljust(15)
+                    if bankline.partner_id.is_company:
+                        f_act_eco = 'B1'   # Persona Jur�dica
+                    else:
+                        f_act_eco = 'BC'   # Persona Natural
+                    f_monto_total = self._truncate_str(t_monto, 11, 0) + '00'
+                    # f_date = self._truncate_str(self.date_generated.day, 2, 0) + self._truncate_str(self.date_generated.month, 2, 0) + str(self.date_generated.year)
+                    f_date = self._truncate_str(
+                        date_today.day, 2, 0) + self._truncate_str(date_today.month, 2, 0) + str(date_today.year)
+                    d_bancos = ['001', '029', '033']
 
+                    if not bankline.partner_bank_id.bank_id.bic:
+                        raise UserError(
+                            _('Codigo de identificacion bancaria (BIC/SWIFT) no existe'))
+                    else:
+                        bic = str(bankline.partner_bank_id.bank_id.bic[-3:])
+                        tipo_cuenta = str(bankline.partner_bank_id.tipo_cuenta)
+                        if bic in d_bancos:  # colocar validacion
+                            f_medio_pago = '01'  # Banco de Chile
+                        else:
+                            f_medio_pago = '07'  # Otros Bancos
+                    f_banco_destino = self._truncate_str(
+                        bankline.partner_bank_id.bank_id.bic[-3:], 3)
+                    #f_oficina_destino = t_filler.ljust(3)
+                    #f_oficina_destino = '000'
+                    f_no_cta_destino = self._truncate_str(
+                        bankline.partner_bank_id.acc_number, 22).ljust(22)
+                    f_descripcion_pago = self._truncate_str(
+                        "Pago de remuneraciones mes de " + str(mes_pago), 118).ljust(118)
+                    f_ind_vva = " "
+                    f_campos_libres_123 = t_filler.ljust(70)
+                    f_contactos = t_filler.ljust(71)
+                    f_fono_fax = t_filler.ljust(14)
+                    if bankline.partner_id.email:
+                        f_email_a = self._truncate_str(
+                            bankline.partner_id.email, 60).ljust(60)
+                        f_canal_aviso = "1"
+                        f_num_aviso = self._truncate_str(bankline.name[-4:], 4)
+                    else:
+                        f_email_a = t_filler.ljust(60)
+                        f_canal_aviso = " "
+                        f_num_aviso = t_filler.ljust(4)
+                    f_email_b = t_filler.ljust(60)
+                    f_filler_02 = t_filler.ljust(18)
+                    f_filler_04 = t_filler.ljust(29)
+                    f_filler_05 = t_filler.ljust(46)
+                    
+
+                    payment_file_content += '02' + self._truncate_str(f_paga_rut, 9, 0) + str(f_paga_rut_dv) + num_convenio + '  ' + str(numero_nomina) + f_medio_pago + f_rut + f_rut_dv + f_nombre  + f_direccion + f_comuna + f_ciudad + '         ' + f_banco_destino + f_no_cta_destino + '000' + f_monto_total + f_descripcion_pago +  str(count_payline_0) + 'N' + t_filler.ljust(13) + '+' + str(count_payline_1) + 'S' + f_filler_05 + '\r\n'
+
+                    # Tipo Fila 03
+                    count_payline_2 = 0
+                    for payline in self.payment_line_ids:
+                        count_payline_2 += 1
+                        count_payline_line3 = self._truncate_str(count_payline_2,4, 0)
+                        if payline.partner_id == bankline.partner_id:
+                            if payline.move_line_id.document_class_id:
+                                f_tipo_doc = self._truncate_str(
+                                    payline.move_line_id.document_class_id.sii_code, 3, 0)
+                                f_doc = 'PAGO DE ' + payline.move_line_id.document_class_id.doc_code_prefix + ': '
+                            else:
+                                f_tipo_doc = self._truncate_str(
+                                    payline.move_line_id.move_id.name, 3)
+                                f_doc = 'PAGO DE DOC: '
+                            f_num_factura_boleta = self._truncate_str(
+                                payline.communication, 10, 0).ljust(10)
+                            f_num_cuota = '001'
+                            f_monto_doc = self._truncate_str(
+                                payline.amount_company_currency, 11, 0) + '00'
+                            # f_due_date = self._truncate_str(payline.ml_maturity_date.day, 2, 0) + self._truncate_str(payline.ml_maturity_date.month, 2, 0) + str(payline.ml_maturity_date.year)
+                            fecha = datetime.strptime(
+                                payline.move_line_id.move_id.date, "%Y-%m-%d")
+                            f_doc_date = self._truncate_str(
+                                fecha.day, 2, 0) + self._truncate_str(fecha.month, 2, 0) + str(fecha.year)
+                            f_doc_descrip = self._truncate_str(f_doc + payline.communication + ' DE FECHA DOC = ' + str(
+                                payline.move_line_id.move_id.date) + ' Y VENCIM. = ' + str(payline.ml_maturity_date), 120).ljust(120)
+                            f_campos_libres_123 = t_filler.ljust(32)
+                            f_filler_03 = t_filler.ljust(368)
+                            email_aviso = 'EMA'
+                            descrip_mensaje = self._truncate_str("Pago de remuneraciones mes de " + str(mes_pago), 58)
+
+                            payment_file_content += '03' +  self._truncate_str(f_paga_rut, 9, 0) + str(f_paga_rut_dv) + num_convenio + '  ' + str(numero_nomina) + count_payline_line3 + email_aviso + f_email_a + f_campos_libres_123 + descrip_mensaje + t_filler.ljust(212) + '000' + t_filler.ljust(22) + '\r\n'
 
                 return (payment_file_content, f_file_name)
 
-
-
             elif self.payment_mode_id.name == 'PRV - Transfer Banco de Chile':
                 # Estructura de Archivo BANCO CHILE - formato Texto
-                # 
+                #
                 #
                 count_payline = len(self.payment_line_ids)
                 # count_payline = 0
@@ -590,125 +740,158 @@ class AccountPaymentOrder(models.Model):
                 t_filler = ""
                 f_paga_rut = ""
                 f_paga_rut_dv = ""
-                f_paga_rut, f_paga_rut_dv = self.env.user.company_id.document_number.split("-")
-                f_paga_rut = f_paga_rut.replace('.','')
-                t_monto_nom, t_decn = str(self.total_company_currency).split(".")
+                f_paga_rut, f_paga_rut_dv = self.env.user.company_id.document_number.split(
+                    "-")
+                f_paga_rut = f_paga_rut.replace('.', '')
+                t_monto_nom, t_decn = str(
+                    self.total_company_currency).split(".")
                 f_monto_nomina = str(t_monto_nom) + '00'
 
-                f_file_name = str(self.name) + ' - ' + str(date_today) + ' - ' + str(self.payment_mode_id.name) + '.txt'
+                f_file_name = str(self.name) + ' - ' + str(date_today) + \
+                    ' - ' + str(self.payment_mode_id.name) + '.txt'
 
                 payment_file_content = ""
 
                 # Tipo Fila 01
                 f_filler_01 = t_filler.ljust(564)
 
-                payment_file_content = '01' + self._truncate_str(f_paga_rut, 10, 0) + str(f_paga_rut_dv) + self._truncate_str(f_monto_nomina, 13, 0) + self._truncate_str(count_bankline, 10, 0) + self._truncate_str(count_payline, 10, 0) + f_filler_01 + '\n'
+                payment_file_content = '01' + self._truncate_str(f_paga_rut, 10, 0) + str(f_paga_rut_dv) + self._truncate_str(
+                    f_monto_nomina, 13, 0) + self._truncate_str(count_bankline, 10, 0) + self._truncate_str(count_payline, 10, 0) + f_filler_01 + '\n'
 
                 for bankline in self.bank_line_ids:
                     f_rut = ""
                     f_rut_dv = ""
-                    f_rut, f_rut_dv = bankline.partner_id.document_number.split("-")
-                    f_rut = f_rut.replace('.','')
+                    f_rut, f_rut_dv = bankline.partner_id.document_number.split(
+                        "-")
+                    f_rut = f_rut.replace('.', '')
                     t_monto, t_dec = str(bankline.amount_currency).split(".")
                     t_streets = str(bankline.partner_id.street)
 
                     # Tipo Fila 02
                     f_rut = self._truncate_str(f_rut, 10, 0)
-                    f_nombre = self._truncate_str(bankline.partner_id.name.upper(), 60).ljust(60)
-                    f_direccion = self._truncate_str(t_streets.upper(), 35).ljust(35)
-                    f_comuna = self._truncate_str(bankline.partner_id.city.upper(), 15).ljust(15)
-                    f_ciudad = self._truncate_str(bankline.partner_id.state_id.name.upper(), 15).ljust(15)
+                    f_nombre = self._truncate_str(
+                        bankline.partner_id.name.upper(), 60).ljust(60)
+                    f_direccion = self._truncate_str(
+                        t_streets.upper(), 35).ljust(35)
+                    f_comuna = self._truncate_str(
+                        bankline.partner_id.city.upper(), 15).ljust(15)
+                    f_ciudad = self._truncate_str(
+                        bankline.partner_id.state_id.name.upper(), 15).ljust(15)
                     if bankline.partner_id.is_company:
-                        f_act_eco = 'B1'   # Persona Jurídica
+                        f_act_eco = 'B1'   # Persona Jur�dica
                     else:
-                        f_act_eco = 'BC'   # Persona Natural                                     
+                        f_act_eco = 'BC'   # Persona Natural
                     f_monto_total = self._truncate_str(t_monto, 11, 0) + '00'
-                    #f_date = self._truncate_str(self.date_generated.day, 2, 0) + self._truncate_str(self.date_generated.month, 2, 0) + str(self.date_generated.year)
-                    f_date = self._truncate_str(date_today.day, 2, 0) + self._truncate_str(date_today.month, 2, 0) + str(date_today.year)
-                    d_bancos = ['001','029','033']
+                    # f_date = self._truncate_str(self.date_generated.day, 2, 0) + self._truncate_str(self.date_generated.month, 2, 0) + str(self.date_generated.year)
+                    f_date = self._truncate_str(
+                        date_today.day, 2, 0) + self._truncate_str(date_today.month, 2, 0) + str(date_today.year)
+                    d_bancos = ['001', '029', '033']
 
                     if not bankline.partner_bank_id.bank_id.bic:
-                        raise UserError(_('Código de identificación bancaria (BIC/SWIFT) no existe'))
+                        raise UserError(
+                            _('Codigo de identificacion bancaria (BIC/SWIFT) no existe'))
                     else:
                         bic = str(bankline.partner_bank_id.bank_id.bic[-3:])
-                        if bic in d_bancos: #colocar validacion
+                        if bic in d_bancos:  # colocar validacion
                             f_medio_pago = '01'  # Banco de Chile
                         else:
                             f_medio_pago = '07'  # Otros Bancos
-                    f_banco_destino = self._truncate_str(bankline.partner_bank_id.bank_id.bic[-3:], 3)
+                    f_banco_destino = self._truncate_str(
+                        bankline.partner_bank_id.bank_id.bic[-3:], 3)
                     f_oficina_destino = t_filler.ljust(3)
-                    f_no_cta_destino = self._truncate_str(bankline.partner_bank_id.acc_number, 22).ljust(22)
-                    f_descripcion_pago = self._truncate_str("PAGO DE " + str(self.env.user.company_id.name).upper(), 120).ljust(120)
+                    f_no_cta_destino = self._truncate_str(
+                        bankline.partner_bank_id.acc_number, 22).ljust(22)
+                    f_descripcion_pago = self._truncate_str(
+                        "PAGO DE " + str(self.env.user.company_id.name).upper(), 120).ljust(120)
                     f_ind_vva = " "
                     f_campos_libres_123 = t_filler.ljust(70)
                     f_contactos = t_filler.ljust(71)
                     f_fono_fax = t_filler.ljust(14)
                     if bankline.partner_id.email:
-                        f_email_a = self._truncate_str(bankline.partner_id.email.upper(), 60).ljust(60)
-                        f_canal_aviso = "1" 
+                        f_email_a = self._truncate_str(
+                            bankline.partner_id.email.upper(), 60).ljust(60)
+                        f_canal_aviso = "1"
                         f_num_aviso = self._truncate_str(bankline.name[-4:], 4)
                     else:
                         f_email_a = t_filler.ljust(60)
                         f_canal_aviso = " "
                         f_num_aviso = t_filler.ljust(4)
                     f_email_b = t_filler.ljust(60)
-                    f_filler_02 = t_filler.ljust(18)                   
+                    f_filler_02 = t_filler.ljust(18)
 
-                    payment_file_content += '02' + f_rut + f_rut_dv +  f_nombre + f_direccion + f_comuna + f_ciudad + f_act_eco + f_monto_total + f_date + f_medio_pago + f_banco_destino + f_oficina_destino + f_no_cta_destino + f_descripcion_pago + f_ind_vva + f_campos_libres_123 + f_contactos + f_canal_aviso + f_fono_fax + f_email_a + f_email_b + f_num_aviso + f_filler_02 + '\n'
+                    payment_file_content += '02' + f_rut + f_rut_dv + f_nombre + f_direccion + f_comuna + f_ciudad + f_act_eco + f_monto_total + f_date + f_medio_pago + f_banco_destino + f_oficina_destino + \
+                        f_no_cta_destino + f_descripcion_pago + f_ind_vva + f_campos_libres_123 + f_contactos + \
+                        f_canal_aviso + f_fono_fax + f_email_a + \
+                        f_email_b + f_num_aviso + f_filler_02 + '\n'
 
                     # Tipo Fila 03
-                    for payline in self.payment_line_ids: 
+                    for payline in self.payment_line_ids:
                         if payline.partner_id == bankline.partner_id:
                             if payline.move_line_id.document_class_id:
-                                f_tipo_doc = self._truncate_str(payline.move_line_id.document_class_id.sii_code, 3, 0)
+                                f_tipo_doc = self._truncate_str(
+                                    payline.move_line_id.document_class_id.sii_code, 3, 0)
                                 f_doc = 'PAGO DE ' + payline.move_line_id.document_class_id.doc_code_prefix + ': '
                             else:
-                                f_tipo_doc = self._truncate_str(payline.move_line_id.move_id.name, 3)
+                                f_tipo_doc = self._truncate_str(
+                                    payline.move_line_id.move_id.name, 3)
                                 f_doc = 'PAGO DE DOC: '
-                            f_num_factura_boleta = self._truncate_str(payline.communication, 10, 0).ljust(10)
+                            f_num_factura_boleta = self._truncate_str(
+                                payline.communication, 10, 0).ljust(10)
                             f_num_cuota = '001'
-                            f_monto_doc = self._truncate_str(payline.amount_company_currency, 11, 0) + '00'
-                            #f_due_date = self._truncate_str(payline.ml_maturity_date.day, 2, 0) + self._truncate_str(payline.ml_maturity_date.month, 2, 0) + str(payline.ml_maturity_date.year)
-                            fecha = datetime.strptime(payline.move_line_id.move_id.date,"%Y-%m-%d")
-                            f_doc_date = self._truncate_str(fecha.day, 2, 0) + self._truncate_str(fecha.month, 2, 0) + str(fecha.year)
-                            f_doc_descrip = self._truncate_str(f_doc + payline.communication + ' DE FECHA DOC = ' + str(payline.move_line_id.move_id.date) + ' Y VENCIM. = ' + str(payline.ml_maturity_date), 120).ljust(120)
+                            f_monto_doc = self._truncate_str(
+                                payline.amount_company_currency, 11, 0) + '00'
+                            # f_due_date = self._truncate_str(payline.ml_maturity_date.day, 2, 0) + self._truncate_str(payline.ml_maturity_date.month, 2, 0) + str(payline.ml_maturity_date.year)
+                            fecha = datetime.strptime(
+                                payline.move_line_id.move_id.date, "%Y-%m-%d")
+                            f_doc_date = self._truncate_str(
+                                fecha.day, 2, 0) + self._truncate_str(fecha.month, 2, 0) + str(fecha.year)
+                            f_doc_descrip = self._truncate_str(f_doc + payline.communication + ' DE FECHA DOC = ' + str(
+                                payline.move_line_id.move_id.date) + ' Y VENCIM. = ' + str(payline.ml_maturity_date), 120).ljust(120)
                             f_campos_libres_123 = t_filler.ljust(70)
-                            f_filler_03 = t_filler.ljust(368)   
+                            f_filler_03 = t_filler.ljust(368)
 
-                            payment_file_content += '03' + f_tipo_doc + f_num_factura_boleta + f_num_cuota + f_monto_doc + f_monto_doc + f_doc_date + f_doc_descrip + f_campos_libres_123 + f_filler_03 + '\n'
+                            payment_file_content += '03' + f_tipo_doc + f_num_factura_boleta + f_num_cuota + f_monto_doc + \
+                                f_monto_doc + f_doc_date + f_doc_descrip + \
+                                f_campos_libres_123 + f_filler_03 + '\n'
 
                     # Tipo Fila 04
                     l_num_aviso = 0
-                    for apayline in self.payment_line_ids:       
+                    for apayline in self.payment_line_ids:
                         if apayline.partner_id == bankline.partner_id and bankline.partner_id.email:
                             l_num_aviso += 1
-                            for abankline in self.bank_line_ids: 
+                            for abankline in self.bank_line_ids:
                                 if abankline.order_id == apayline.order_id:
-                                    f_num_aviso = self._truncate_str(abankline.name[-4:], 4)
+                                    f_num_aviso = self._truncate_str(
+                                        abankline.name[-4:], 4)
                             if apayline.move_line_id.document_class_id:
-                                f_tipo_doc = self._truncate_str(apayline.move_line_id.document_class_id.sii_code, 3, 0)
+                                f_tipo_doc = self._truncate_str(
+                                    apayline.move_line_id.document_class_id.sii_code, 3, 0)
                                 f_doc = apayline.move_line_id.document_class_id.doc_code_prefix + ': '
                             else:
-                                f_tipo_doc = self._truncate_str(apayline.move_line_id.move_id.name, 3)
+                                f_tipo_doc = self._truncate_str(
+                                    apayline.move_line_id.move_id.name, 3)
                                 f_doc = 'DOC: '
-                            f_monto_aviso = self._truncate_str(apayline.amount_company_currency, 11).ljust(11)
-                            f_glosa_aviso = self._truncate_str("AVISO PAGO DE " + str(self.env.user.company_id.name).upper() + ' PARA ' + apayline.partner_id.name.upper() + ' DE SU ' + f_doc + apayline.communication + ' POR VALOR DE ' + f_monto_aviso, 320).ljust(320)
-                            f_corr_aviso = self._truncate_str(str(l_num_aviso), 5, 0)
-                            #f_due_date = self._truncate_str(payline.ml_maturity_date.day, 2, 0) + self._truncate_str(payline.ml_maturity_date.month, 2, 0) + str(payline.ml_maturity_date.year)
-                            #f_doc_date = self._truncate_str(apayline.move_line_id.move_id.date.day, 2, 0) + self._truncate_str(apayline.move_line_id.move_id.date.month, 2, 0) + str(apayline.move_line_id.move_id.date.year)
-                            f_filler_04 = t_filler.ljust(279)   
-                            
-                            payment_file_content += '04' + f_num_aviso + f_glosa_aviso + f_corr_aviso + f_filler_04 + '\n'
-                            
+                            f_monto_aviso = self._truncate_str(
+                                apayline.amount_company_currency, 11).ljust(11)
+                            f_glosa_aviso = self._truncate_str("AVISO PAGO DE " + str(self.env.user.company_id.name).upper() + ' PARA ' + apayline.partner_id.name.upper(
+                            ) + ' DE SU ' + f_doc + apayline.communication + ' POR VALOR DE ' + f_monto_aviso, 320).ljust(320)
+                            f_corr_aviso = self._truncate_str(
+                                str(l_num_aviso), 5, 0)
+                            # f_due_date = self._truncate_str(payline.ml_maturity_date.day, 2, 0) + self._truncate_str(payline.ml_maturity_date.month, 2, 0) + str(payline.ml_maturity_date.year)
+                            # f_doc_date = self._truncate_str(apayline.move_line_id.move_id.date.day, 2, 0) + self._truncate_str(apayline.move_line_id.move_id.date.month, 2, 0) + str(apayline.move_line_id.move_id.date.year)
+                            f_filler_04 = t_filler.ljust(279)
+
+                            payment_file_content += '04' + f_num_aviso + \
+                                f_glosa_aviso + f_corr_aviso + f_filler_04 + '\n'
+
                 return (payment_file_content, f_file_name)
 
             else:
                 raise UserError(_(
-                "No file structure available for this payment method. Check "
-                "supported payment methods and method name spelling."))
+                    "No file structure available for this payment method. Check "
+                    "supported payment methods and method name spelling."))
 
                 return (False, False)
-            
 
     @api.multi
     def open2generated(self):
@@ -720,10 +903,11 @@ class AccountPaymentOrder(models.Model):
                 'res_model': 'account.payment.order',
                 'res_id': self.id,
                 'name': filename,
-                #'datas': base64.b64encode(payment_file_str),
-                'datas': base64.b64encode(bytes(payment_file_str, 'utf-8')),
+                #'datas': payment_file_str.encode('ascii', 'ignore'),
+                #'datas': base64.b64encode(bytes(payment_file_str, 'ascii', 'ignore')),
+                'datas': base64.b64encode(payment_file_str.encode('utf-8')).decode('ascii'),
                 'datas_fname': filename,
-                })
+            })
             simplified_form_view = self.env.ref(
                 'account_payment_order.view_attachment_simplified_form')
             action = {
@@ -734,12 +918,12 @@ class AccountPaymentOrder(models.Model):
                 'type': 'ir.actions.act_window',
                 'target': 'current',
                 'res_id': attachment.id,
-                }
+            }
         self.write({
             'date_generated': fields.Date.context_today(self),
             'state': 'generated',
             'generated_user_id': self._uid,
-            })
+        })
         return action
 
     @api.multi
@@ -750,7 +934,7 @@ class AccountPaymentOrder(models.Model):
         self.write({
             'state': 'uploaded',
             'date_uploaded': fields.Date.context_today(self),
-            })
+        })
         # Insert Intellego-BI: Marcar como hecho tras confirmar Upload
         self.write({'state': 'done'})
         return True
@@ -772,7 +956,7 @@ class AccountPaymentOrder(models.Model):
             'ref': ref,
             'payment_order_id': self.id,
             'line_ids': [],
-            }
+        }
         return vals
 
     @api.multi
@@ -815,7 +999,7 @@ class AccountPaymentOrder(models.Model):
             vals.update({
                 'currency_id': bank_lines[0].currency_id.id,
                 'amount_currency': amount_payment_currency * sign,
-                })
+            })
         return vals
 
     @api.multi
@@ -843,14 +1027,14 @@ class AccountPaymentOrder(models.Model):
                        bank_line.amount_company_currency or 0.0),
             'debit': (self.payment_type == 'outbound' and
                       bank_line.amount_company_currency or 0.0),
-            }
+        }
 
         if bank_line.currency_id != bank_line.company_currency_id:
             sign = self.payment_type == 'inbound' and -1 or 1
             vals.update({
                 'currency_id': bank_line.currency_id.id,
                 'amount_currency': bank_line.amount_currency * sign,
-                })
+            })
         return vals
 
     @api.multi
@@ -890,5 +1074,3 @@ class AccountPaymentOrder(models.Model):
             blines.reconcile_payment_lines()
             if post_move:
                 move.post()
-
-
